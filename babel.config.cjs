@@ -2,7 +2,7 @@ module.exports = (api) => {
   api.cache(true)
 
   const browserTarget = '> 0.25%, not dead'
-  const nodeTarget = 'node 14.16'
+  const nodeTarget = { node: '4.4' }
 
   const buildMixin = {
     ignore: ['./__tests__', './**/*.d.ts'],

@@ -1,12 +1,17 @@
-import { copyFile } from 'fs/promises'
 import { join } from 'path'
 
 import gulp from 'gulp'
 import babel from 'gulp-babel'
+import { createGulpEsbuild } from 'gulp-esbuild'
 import rename from 'gulp-rename'
 import sourcemaps from 'gulp-sourcemaps'
 
 import { BUILD_DIR, DIST_DIR, SRC_DIR } from '../constants'
+
+const esbuild = createGulpEsbuild({
+  incremental: true,
+  pipe: true,
+})
 
 type Variant = 'cjs' | 'esm'
 
@@ -41,18 +46,25 @@ function transpileBabel(variant: Variant) {
   return task
 }
 
-function copyModuleLoader(variant: Variant) {
+function transpileModuleLoader(variant: Variant) {
   const task = () =>
-    copyFile(
-      join(BUILD_DIR, `MediaInfoModule.${variant}.js`),
-      join(DIST_DIR, variant, `MediaInfoModule${variant === 'cjs' ? '.cjs' : '.js'}`)
-    )
-  task.displayName = `transpile:babel:copy-loader:${variant}`
+    gulp
+      .src(join(BUILD_DIR, `MediaInfoModule.${variant}.js`))
+      .pipe(
+        esbuild({
+          outfile: `MediaInfoModule${variant === 'cjs' ? '.cjs' : '.js'}`,
+          minify: true,
+          platform: 'node',
+          target: 'node7',
+        })
+      )
+      .pipe(gulp.dest(join(DIST_DIR, variant)))
+  task.displayName = `transpile:esbuild:loader-${variant}`
   return task
 }
 
-const esmTask = gulp.series([transpileBabel('esm'), copyModuleLoader('esm')])
-const cjsTask = gulp.series([transpileBabel('cjs'), copyModuleLoader('cjs')])
+const esmTask = gulp.parallel([transpileBabel('esm'), transpileModuleLoader('esm')])
+const cjsTask = gulp.parallel([transpileBabel('cjs'), transpileModuleLoader('cjs')])
 
 const babelTask = gulp.parallel([esmTask, cjsTask])
 babelTask.displayName = 'transpile:babel'
